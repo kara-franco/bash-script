@@ -1,0 +1,277 @@
+#!/bin/bash 
+# stats.sh
+# Kara Franco
+# CS 344 Operating Systems
+# Program 1 - A bash shell script that computes statistics. This program may be used to calculate the averages 
+# and medians of either the rows OR columns of an input file of whole numbers. 
+
+# program will start when user enters the correct commands - stats {-rows|-cols} {file}  OR
+# 						           - cat {file} | stats {-rows|cols}
+# {-rows|-cols} means that the user should choose to compute statistics on either rows OR columns 
+
+# --------------------- check for correct number and format of arguments -----------------------------------
+
+# if command has too many or too few arguements then output error to std err
+
+
+# $# has a value that represents the number of arguments were passed to the stats program
+# this concept was introduced on the class discussion forum:
+# 		stats = command (or 0th element of arguements)
+# 	        -rows = 1st agrument ($1)
+#	    test_file = 2nd argument ($2)
+
+
+if [ "$#" -gt 2 -o "$#" -lt 1 ]
+then 
+	echo "Usage: stats {-rows|-cols} {file}" 1>&2
+	exit 1 
+fi
+
+# allow users to abbreviate -rows and -cols
+# if command has arguments in wrong format output error to std err
+# Positional Parameters: the below method was introduced to me on the class dicussion forum:
+# 		- ${1: this is looking at the 1st argument (-rows or -cols)
+#		- 0: start at the 0th place in string 
+#		- 2} look at the 2 first place (-r or -c)
+
+# || is conditonal expression for OR (-o would not work)  
+if [[ "${1:0:2}" == '-r' || "${1:0:2}" == '-c' ]]
+
+# use of : which is a null command
+# the use of != was not allowing proper control flow :(
+then 
+:
+else
+	echo "Usage: stats {-rows|-cols} {file}" 1>&2
+	exit 1
+fi
+
+# ------------------------------ read file and store to temporary file -----------------------------------
+
+# create tempFile variable with PID in name (use of $$) to ensure the program can be ran 'rapid fire'
+# set up trap command to remove if any disruptions:
+# 1 = hangup; 2 = interrupt from keyboard; 15 = termination signal 
+
+
+tempFile=$$temp
+trap "rm -f $tempFile; exit 1" 1 2 15
+
+# check if user supplied file in command
+# if there is one arguement, then we can read file from stdin 
+# if input file is not readable than send output error to std error
+
+
+# below is checking if there is a file provided in argument 2 postion and is it readable (-r)
+
+if  [ "$#" -eq 2 -a ! -r "$2" ]
+then
+	echo "stats: cannot read ${2}" 1>&2
+	exit 1
+fi
+
+# read file and store in temporay file
+# this statement is checking for the number of arguments
+# if there is 1 argument, then read from stdin since the file was given in cat test_file | stats -r format
+# else, cat the file from argument 2 since the file was given in stats -r test_file format
+if [ "$#" -eq 1 ]
+then
+	while read line 
+	do 
+		echo $line >> $tempFile
+	done
+else
+# this method below was suggested by the professor in the class discussion forum
+	cat "$2" > $tempFile  
+fi
+
+# ------------------------- calculating statistics for the rows of the file -------------------------------
+
+# statement checks if user wants to compute statistics for rows
+if [[ "${1:0:2}" == '-r' ]]
+then 
+
+# since we need our output to print in columns, print Average and Median and read each row into a lineArray
+
+
+
+
+
+	echo "Average	Median"
+
+# ------------------------------------------ average -------------------------------------------------------
+	while read -r line 
+	do
+# initialize variables to numeric values that will hold:
+# index count(number of values per line), sum, middle value and median 
+		sum=0
+		indexCount=0 
+		middle=0
+		median=0
+
+			for i in $line
+			do
+# i holds the current value in the line, it is being added to sum, this syntax was discussed in class forum
+				sum=$(expr "$sum" + "$i") 
+# capture the value of i into the array at current index count, lineArray is used for average & median calc.
+				lineArray[$indexCount]=$i
+				indexCount=$(expr $indexCount + 1)
+			done
+
+# all numbers must be whole numbers 
+# if half value occurs, round up (7.5 = 8)
+
+
+# by default Bash will round 3.75 OR 3.5 to 3, thus we need to add .5 to every number
+# to do this, we take the index counter, divide by 2 and add that to the sum
+		average=$((($sum + $indexCount / 2) / $indexCount))
+
+# -------------------------------------------- median -----------------------------------------------------
+
+# to calculate the median, sort the values and take the middle value 
+# if number of rows is even, take the largest of the two middle (54, 83, 90, 97 median will be 90)
+
+# Selection sort implementation
+
+		for ((i=0; i<$indexCount-1; i++))
+		do
+# initiate minNumber to the first value in line, every number after arr[0] will be compared if less than
+			minNumber=${lineArray[$i]} 
+			index=$i
+# look at next numbers to see if it is less than, if so arr[j] = minNumber, if not, place minNum in lineArray
+			for ((j=i+1; j<$indexCount; j++))
+			do
+				if ((lineArray[j]<minNumber))
+				then
+					minNumber=${lineArray[$j]}
+					index=$j
+				fi
+			done
+ # tempHolder stores the value of the current index while the current minNumber is being placed in lineArray
+			tempHolder=${lineArray[$i]}
+			lineArray[$i]=${lineArray[$index]}
+			lineArray[$index]=$tempHolder
+		done
+# this method of finding the middle of the line was found on the class discussion forum: 
+# since the array starts at 0, we have to simply divide by 2 for both odd and even line cases
+# for refererence for the below 
+# (if there are 4 values per line, 4/2 = 2, index 2 equals the third value in the array, 54, 83, 90. 97 = 90)
+# (if there are 5 values per line, 5/2 = 2, index 2 equals the thrid value in the array, 2, 5, 6, 10, 12 = 6)  
+		middle=$(expr "$indexCount" / 2)
+		median=${lineArray[middle]}
+
+# print out the averages and medians to screen with spaces inbetween
+		echo "$average" "	" "$median"
+	done < $tempFile
+fi
+
+# --------------------------- calculating statistics for the columns of the file ----------------------------
+
+# statement checks if user wants to compute statistics for columns
+if [[ "${1:0:2}" == '-c' ]]
+then 
+
+# to find the number columns in the table, find the number of values in a row 
+# the method below was introduced to me on the class discussion forum:
+# 							- head will only read the first 10 rows
+#							- -n 1  will tell head only read the first row
+#							- $tempfile holds the copy of the input file
+#							- | sends the above to wc -w
+#							- wc -w returns/hold the number of values per row
+	numberOfCols=$(head -n 1 $tempFile | wc -w) 
+	colNumber=0
+
+
+
+
+
+# -------------------------------------------- average ------------------------------------------------------
+
+# while the current column number is less than the number of cols in the file then calculate BOTH statisics
+# this is different then how rows are handled, so build two arrays of averages and medians
+		while [ $colNumber -lt "$numberOfCols" ]
+		do
+# declare variables that will hold index count(number of values per col), sum, middle value and median 
+		indexCount=0
+		sum=0
+		middle=0
+		median=0
+
+			while read -r line
+			do
+# put current line of file in lineArray variable 
+				lineArray=($line)
+
+# the ave and median is calculated as each column is captured, these values are then placed in ave/med arrays
+# while at the curr col number (start at 0) read the value and put it into the colunm array (start at index 0) 
+				columnArray[$indexCount]=${lineArray[$colNumber]}
+# increase the index by one for the next element to be captured
+				indexCount=$(expr "$indexCount" + 1)
+# this will continue until all elements are captured in the colunm array (hit the end of the file) 
+# as the colunm number increases, this will repeat
+			done < $tempFile
+# next calculate the sum of the values captured in the colunm array
+			for i in "${columnArray[@]}"
+			do 
+			sum=$(expr "$sum" + "$i")
+
+			done
+# use the same fomula as the row calculation to calculate the average (rounding included)
+		average=$((($sum + $indexCount / 2) / $indexCount))
+# place the number into the average array (at the index of the column number)and store until printing
+		averageArray[$colNumber]=$average
+
+# ---------------------------------------------- median ---------------------------------------------------
+
+# treat the column array as we did with the line array (for the row calculations) and sort
+# use selection sort
+			for ((i=0; i<$indexCount-1; i++))
+			do
+				minNumber=${columnArray[$i]}
+				index=$i
+				for ((j=i+1; j<$indexCount; j++))
+				do
+					if ((columnArray[j]<minNumber))
+					then 
+						minNumber=${columnArray[$j]}
+						index=$j
+					fi
+				done
+
+				tempHolder=${columnArray[$i]}
+
+				columnArray[$i]=${columnArray[$index]}
+
+				columnArray[$index]=$tempHolder
+
+			done 
+
+# place the middle number (at index middle) into the median array
+			middle=$(expr "$indexCount" / 2)
+			median=${columnArray[middle]}
+# store the median in median array until printing, index will increase with colNumber
+			medianArray[$colNumber]=$median
+			colNumber=$(expr $colNumber + 1)
+		done
+# print the averages from the average array
+# use | colunm to print in correct colunm format
+
+	echo "Averages:"
+
+	for i in "${averageArray[@]}"
+	do
+		echo "${i}"
+	done | column 
+# print the medians from the median array
+	echo "Medians:" 
+	for i in "${medianArray[@]}"
+	do
+		echo "${i}"
+	done | column
+
+fi 
+
+
+# remove the temporary file 
+rm -f $tempFile
+
+
