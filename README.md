@@ -33,17 +33,17 @@ Example usage of program:
 
 Average Median
 
-1 1
+1       1
 
-5 5
+5       5
 
-7 7
+7       7
 
-5 6
+5       6
 
-3 3
+3       3
 
-6 6
+6       6
 
 % cat test_file | stats –c
 
